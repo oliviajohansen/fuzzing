@@ -55,7 +55,7 @@ static void process_object(json_value* value, int depth)
         length = value->u.object.length;
         for (x = 0; x < length; x++) {
                 print_depth_shift(depth);
-                printf("object[%d].name = %s\n", x, value->u.object.values[x].name);
+                // printf("object[%d].name = %s\n", x, value->u.object.values[x].name);
                 process_value(value->u.object.values[x].value, depth+1, -1);
         }
 }
@@ -67,7 +67,7 @@ static void process_array(json_value* value, int depth)
                 return;
         }
         length = value->u.array.length;
-        printf("array\n");
+        // printf("array\n");
         for (x = 0; x < length; x++) {
                 process_value(value->u.array.values[x], depth, -1);
         }
@@ -112,7 +112,7 @@ static void process_value(json_value* value, int depth, int file_size)
         }
         switch (value->type) {
                 case json_none: // test double free
-                        printf("none\n");
+                        // printf("none\n");
                         break;
                 case json_object:
                         process_object(value, depth+1);
@@ -135,15 +135,15 @@ static void process_value(json_value* value, int depth, int file_size)
                         ******************************************************************************/
                         if (ui > INT_MAX || INT_MAX - ui < 0) {
                          printf("overflow detected in %llu\n", ui);
-                         abort();
+                         exit(136);
                         /****** END vulnerable code **************************************************/
                         } else {
-                         printf("int: %10" PRId64 "\n", value->u.integer);
+                        //  printf("int: %10" PRId64 "\n", value->u.integer);
                         }
                         break;
                 case json_double:
                         d = value->u.dbl;
-                        printf("double: %f\n", d);
+                        // printf("double: %f\n", d);
                         i = d;
                         if (i >= -4 && i <= -1) {
                                 y = malloc(sizeof(int));
@@ -162,18 +162,17 @@ static void process_value(json_value* value, int depth, int file_size)
                                 x[-4] = 9;
                                 /****** END vulnerable code **************************************************/
                                 printf("heap buffer overflow detected, y[0] = %d\n", y[0]);
-                                abort();
+                                exit(139);
                         }
                         break;
                 case json_string:
                         str = value->u.string.ptr;
-                        printf("string: %s\n", str);
+                        // printf("string: %s\n", str);
                         if (file_size != -1) f(str, file_size - 2); // - 2 to substract the front and back quotation marks
                         if (file_size - 2 == 6) printf("%s%s%s", str);
-                        printf("Here99");
                         break;
                 case json_boolean:
-                        printf("bool: %d\n", value->u.boolean);
+                        // printf("bool: %d\n", value->u.boolean);
                         break;
                 case json_null: 
                         // will never reach here because of a previous check for null
@@ -223,9 +222,9 @@ int main(int argc, char** argv)
         }
         fclose(fp);
 
-        printf("%s\n", file_contents);
+        // printf("%s\n", file_contents);
 
-        printf("--------------------------------\n\n");
+        // printf("--------------------------------\n\n");
 
         json = (json_char*)file_contents;
 

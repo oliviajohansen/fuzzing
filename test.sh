@@ -47,5 +47,5 @@ echo "running input-files/oneByteString"
 ./main input-files/oneByteString
 
 # format string vulnerabilities - mismatch num of arguments when string input is length 6 (excl quotation marks)
-echo "running input-files/sizeByteString"
-./main input-files/sizeByteString
+echo "running input-files/sixByteString"
+./main input-files/sixByteString
