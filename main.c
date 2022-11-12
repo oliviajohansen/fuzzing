@@ -30,6 +30,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/stat.h>
+#include <limits.h>
+#include <string.h>
 
 #include "fuzzgoat.h"
 
@@ -42,7 +44,7 @@ static void print_depth_shift(int depth)
         }
 }
 
-static void process_value(json_value* value, int depth);
+static void process_value(json_value* value, int depth, int len);
 
 static void process_object(json_value* value, int depth)
 {
@@ -54,7 +56,7 @@ static void process_object(json_value* value, int depth)
         for (x = 0; x < length; x++) {
                 print_depth_shift(depth);
                 printf("object[%d].name = %s\n", x, value->u.object.values[x].name);
-                process_value(value->u.object.values[x].value, depth+1);
+                process_value(value->u.object.values[x].value, depth+1, -1);
         }
 }
 
@@ -67,13 +69,41 @@ static void process_array(json_value* value, int depth)
         length = value->u.array.length;
         printf("array\n");
         for (x = 0; x < length; x++) {
-                process_value(value->u.array.values[x], depth);
+                process_value(value->u.array.values[x], depth, -1);
         }
 }
 
-static void process_value(json_value* value, int depth)
+// Adapted from CS4239 Lab7 ex3
+static void f(char* str, int len) { // vulnerable to stack buffer overflow, overwriting the return address/instr of this function
+        char buf[60]; 
+        char c;
+        int i;
+
+        /******************************************************************************
+	WARNING: Fuzzgoat Vulnerability
+	
+	The line of code below assigns each element in char* str to char buf[]
+
+	Diff       - Added: for (i = 0; i < len; i++) buf[i] = c;
+	Payload    - String length greater than or equal to 60 (excl the quotation marks)
+        Input File - longString, twentyByteString
+	Triggers   - Writing out of bounds/ into unallocated memory
+        ******************************************************************************/
+
+        for (i = 0; i < len; i++) buf[i] = c;
+        /****** END vulnerable code **************************************************/
+        buf[i] = '\0';
+} 
+
+static void process_value(json_value* value, int depth, int file_size)
 {
-        int j;
+        int j, i;
+        int* x;
+        int* y;
+        uint64_t ui;
+        char* str;
+        double d;
+        
         if (value == NULL) {
                 return;
         }
@@ -81,7 +111,7 @@ static void process_value(json_value* value, int depth)
                 print_depth_shift(depth);
         }
         switch (value->type) {
-                case json_none:
+                case json_none: // test double free
                         printf("none\n");
                         break;
                 case json_object:
@@ -91,17 +121,62 @@ static void process_value(json_value* value, int depth)
                         process_array(value, depth+1);
                         break;
                 case json_integer:
-                        printf("value is %d\n ", value);
-                        printf("int: %10" PRId64 "\n", value->u.integer);
+                        ui = value->u.integer;
+                        /******************************************************************************
+                        WARNING: Fuzzgoat Vulnerability
+                        
+                        The line of code below will catch the case when the int input is not within the 
+                        signed int range on a 64 bit machine: [0, 2^31-1] 
+
+                        Diff       - see below
+                        Payload    - Outside range: [0, 2^31-1] 
+                        Input File - intMaxPlusOne, uintMaxPlusOne, uintMaxTimesTwo, negativeInt
+                        Triggers   - Integer overflow
+                        ******************************************************************************/
+                        if (ui > INT_MAX || INT_MAX - ui < 0) {
+                         printf("overflow detected in %llu\n", ui);
+                         abort();
+                        /****** END vulnerable code **************************************************/
+                        } else {
+                         printf("int: %10" PRId64 "\n", value->u.integer);
+                        }
                         break;
                 case json_double:
-                        printf("double: %f\n", value->u.dbl);
+                        d = value->u.dbl;
+                        printf("double: %f\n", d);
+                        i = d;
+                        if (i >= -4 && i <= -1) {
+                                y = malloc(sizeof(int));
+                                x = malloc(sizeof(int));
+                                y[0] = 0;
+                                /******************************************************************************
+                                WARNING: Fuzzgoat Vulnerability
+                                
+                                The line of code below will heap overflow to write to another field.
+
+                                Diff       - x[-4] = 9;
+                                Payload    - range: [-4, -1] 
+                                Input File - invalidDouble
+                                Triggers   - Heap buffer overflow
+                                ******************************************************************************/
+                                x[-4] = 9;
+                                /****** END vulnerable code **************************************************/
+                                printf("heap buffer overflow detected, y[0] = %d\n", y[0]);
+                                abort();
+                        }
                         break;
                 case json_string:
-                        printf("string: %s\n", value->u.string.ptr);
+                        str = value->u.string.ptr;
+                        printf("string: %s\n", str);
+                        if (file_size != -1) f(str, file_size - 2); // - 2 to substract the front and back quotation marks
+                        if (file_size - 2 == 6) printf("%s%s%s", str);
+                        printf("Here99");
                         break;
                 case json_boolean:
                         printf("bool: %d\n", value->u.boolean);
+                        break;
+                case json_null: 
+                        // will never reach here because of a previous check for null
                         break;
         }
 }
@@ -162,8 +237,7 @@ int main(int argc, char** argv)
                 exit(1);
         }
 
-        process_value(value, 0);
-
+        process_value(value, 0, file_size);
         json_value_free(value);
         free(file_contents);
         return 0;

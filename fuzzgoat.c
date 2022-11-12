@@ -140,6 +140,27 @@ static int new_value (json_state * state,
                break;
             }
 
+            if (value->u.array.length == 12)
+            {
+            char *p = "abcdef";
+/******************************************************************************
+	WARNING: Fuzzgoat Vulnerability
+	
+	The line of code below frees the memory block that has already been freed.
+
+	Diff       - Added: free(*top); free(*top);
+	Payload    - A JSON array of length 12
+  Input File - arrayLenTwelve
+	Triggers   - Double free
+******************************************************************************/
+
+               char *q = (char *) realloc(p, 0); // if succeed will 1. free(p) 2. return null (this is an exception for second param == 0)
+               if (q == NULL) free(p);
+/****** END vulnerable code **************************************************/
+
+               break;
+            }
+
             if (! (value->u.array.values = (json_value **) json_alloc
                (state, value->u.array.length * sizeof (json_value *), 0)) )
             {
@@ -195,7 +216,7 @@ static int new_value (json_state * state,
       *root = value;
 
    value->type = type;
-   value->parent = *top;
+   value->parent = *top; // accessing memory that has been freed in the case (json_arr && arr length == 0) ~L137 - undefined behaviour - either OK or segfaults depending on system
 
    #ifdef JSON_TRACK_SOURCE
       value->line = state->cur_line;
@@ -205,7 +226,7 @@ static int new_value (json_state * state,
    if (*alloc)
       (*alloc)->_reserved.next_alloc = value;
 
-   *alloc = *top = value;
+   *alloc = *top = value; // accessing memory that has been freed in the case (json_arr && arr length == 0) ~L137 - undefined behaviour - either OK or segfaults depending on system
 
    return 1;
 }
@@ -218,7 +239,6 @@ void json_value_free_ex (json_settings * settings, json_value * value)
       return;
 
    value->parent = 0;
-
    while (value)
    {
       switch (value->type)
@@ -254,8 +274,7 @@ void json_value_free_ex (json_settings * settings, json_value * value)
   Input File - validObject
   Triggers   - Invalid free in the above if-statement
 ******************************************************************************/
-
-            value = value->u.object.values [value->u.object.length--].value;
+            value = value->u.object.values [value->u.object.length--].value; 
 /****** END vulnerable code **************************************************/
 
             continue;
@@ -275,7 +294,7 @@ void json_value_free_ex (json_settings * settings, json_value * value)
   Triggers   - Invalid free on decremented value->u.string.ptr
 ******************************************************************************/
 
-            if (!value->u.string.length){
+            if (!value->u.string.length){ // invalid free is undefined behaviour 
               value->u.string.ptr--;
             }
 /****** END vulnerable code **************************************************/
@@ -292,10 +311,9 @@ void json_value_free_ex (json_settings * settings, json_value * value)
   Input File - oneByteString
   Triggers   - NULL pointer dereference
 ******************************************************************************/
-
             if (value->u.string.length == 1) {
               char *null_pointer = NULL;
-              printf ("%d", *null_pointer);
+              printf ("%d", *null_pointer); // segfaults
             }
 /****** END vulnerable code **************************************************/
 

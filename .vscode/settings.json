@@ -1,0 +1,14 @@
+{
+  "files.associations": {
+    "string.h": "c",
+    "__bit_reference": "c",
+    "bitset": "c",
+    "chrono": "c",
+    "__memory": "c",
+    "limits": "c",
+    "ratio": "c",
+    "tuple": "c",
+    "type_traits": "c",
+    "vector": "c"
+  }
+}
