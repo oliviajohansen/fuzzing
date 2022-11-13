@@ -11,6 +11,8 @@ declare -i exitWithFailureCount = 0
 declare -i totalCount = 0
 declare -i exit = 0
 declare -i err_code_count = 0
+declare -i unique_err_code_count = 0
+declare -i err_code_one_count = 0
 
 for FILE in "/Users/oliviajohansen/Desktop/CS4239/fuzzgoat"/fuzz-*; do
     printf "\n";
@@ -33,21 +35,29 @@ for FILE in "/Users/oliviajohansen/Desktop/CS4239/fuzzgoat"/fuzz-*; do
 done
 
 printf "\n---------------------------------------SUMMARY---------------------------------------\n";
-echo "exit with failure count : total count is $exitWithFailureCount : $totalCount";
+echo "crashes : total runs is $exitWithFailureCount : $totalCount";
 for key in "${!error_codes_dict[@]}"; do
-    printf("error code $key occured ${error_codes_dict[$key]} times");
+    echo -n "error code $key occured ${error_codes_dict[$key]} times";
     if [ $key == 1 ] 
-    then printf(" (ignore - due to invalid parsing of data structure)")
-    else if [ $key == 139]
-    then printf(" (Segfault)")
-    else if [ $key == 138]
-    then printf( " (SIGBUS)")
-    else if [ $key == 136 ]
-    then printf( "(SIGFPE) - floating point err or interger overflow")
-    else if [ $key == 0 ]
-    then printf( "(OK)")
+    then echo -n " (ignore - due to invalid parsing of data structure)";
+    elif [ $key == 139 ]
+    then echo -n " (SEGFAULT)";
+    elif [ $key == 138 ]
+    then echo -n " (SIGBUS)";
+    elif [ $key == 136 ]
+    then echo -n "(SIGFPE) - floating point err or integer overflow";
+    elif [ $key == 134 ]
+    then echo -n " (SIGABRT)"
+    elif [ $key == 0 ]
+    then echo -n " (OK)";
     fi
-    printf("\n")
+    echo "."
+
+    if [ $key != 1 ] 
+    then 
+      let unique_err_code_count++
+    fi
 done
-
-
+err_code_one_count=$(( error_codes_dict[1] ))
+echo "excluding exit code 1, crashes : total runs is $((exitWithFailureCount-err_code_one_count)) : $((totalCount-err_code_one_count))"
+echo "unique crashes count: $unique_err_code_count"
